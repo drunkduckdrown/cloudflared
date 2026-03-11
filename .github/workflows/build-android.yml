@@ -15,11 +15,31 @@ jobs:
         include:
           - arch: arm64
             out: cloudflared-arm64-v8a
+            cgo: "0"
+            cc: aarch64-linux-android21-clang
           - arch: arm
             out: cloudflared-armeabi-v7a
+            cgo: "1"
+            goarm: "7"
+            cc: armv7a-linux-androideabi21-clang
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Java (for Android SDK)
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: |
+          sdkmanager "ndk;26.1.10909125"
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/26.1.10909125" >> $GITHUB_ENV
+          echo "PATH=${ANDROID_SDK_ROOT}/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH" >> $GITHUB_ENV
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -31,7 +51,9 @@ jobs:
         env:
           GOOS: android
           GOARCH: ${{ matrix.arch }}
-          CGO_ENABLED: "0"
+          GOARM: ${{ matrix.goarm }}
+          CGO_ENABLED: ${{ matrix.cgo }}
+          CC: ${{ matrix.cc }}
         run: |
           mkdir -p dist
           go build -trimpath -ldflags "-s -w" -o dist/${{ matrix.out }} ./cmd/cloudflared
